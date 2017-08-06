@@ -35,9 +35,12 @@ metadata {
                 [value: 100, color: "#bc2323"]
             ])
         }
-        controlTile("heatSliderControl", "device.heatingSetpoint", "slider", height: 1, width: 2, inactiveLabel: false, range:"(70..106)") {
+
+        controlTile("heatSliderControl", "device.heatingSetpoint", "slider", 
+                    height: 1, width: 2, inactiveLabel: false, range:"(70..106)") {
             state "setHeatingSetpoint", action:"thermostat.setHeatingSetpoint", backgroundColor:"#e86d13"
         }
+
         valueTile("heatingSetpoint", "device.heatingSetpoint", inactiveLabel: false, decoration: "flat") {
             state "heat", label:'${currentValue}°', unit:'${temperatureScale}', backgroundColor:"#ffffff"
         }
@@ -45,9 +48,11 @@ metadata {
 		standardTile("refresh", "device.temperature", inactiveLabel: false, decoration: "flat") {
 			state "default", action:"refresh.refresh", icon:"st.secondary.refresh"
 		}
+
 		standardTile("configure", "device.configure", inactiveLabel: false, decoration: "flat") {
 			state "configure", label:'', action:"configuration.configure", icon:"st.secondary.configure"
 		}
+
 		main "temperature"
 		details(["temperature", "heatSliderControl", "heatingSetpoint", "refresh", "configure"])
     }
@@ -62,7 +67,7 @@ def parse(description) {
 
     def msg = parseLanMessage(description)
 
-    log.debug "Parsing '${description}'"
+    // log.debug "Parsing '${description}'"
 
     def headersAsString = msg.header // => headers as a string
     def headerMap = msg.headers      // => headers as a Map
@@ -71,6 +76,12 @@ def parse(description) {
     def json = msg.json              // => any JSON included in response body, as a data structure of lists and maps
     def xml = msg.xml                // => any XML included in response body, as a document tree structure
     def data = msg.data              // => either JSON or XML in response body (whichever is specified by content-type header in response)
+    def ip = msg.ip
+    def port = msg.port
+
+    sync(ip, port)
+
+    log.debug "Parse ip ${ip}, port ${port}"
 }
 
 def getTemperature(value) {
@@ -93,21 +104,26 @@ def setHeatingSetpoint(degrees) {
 		sendEvent("name": "heatingSetpoint", "value": degreesInteger, "unit": temperatureScale)
 
 		def celsius = (getTemperatureScale() == "C") ? degreesInteger : (fahrenheitToCelsius(degreesInteger) as Double).round(2)
-		// "st wattr 0x${device.deviceNetworkId} 1 0x201 0x12 0x29 {" + hex(celsius * 100) + "}"
+
+        log.debug "/setHeatingSetpoint?set=${degreesInteger}&scale=${temperatureScale}"
+
+        def result = new physicalgraph.device.HubAction (
+            method: "POST",
+            path: "/setHeatingSetpoint?set=${degreesInteger}&scale=${temperatureScale}",
+            headers: [
+                HOST: getHostAddress()
+            ]
+        )
 	}
 }
 def refresh() {
     def setPoint = device.currentValue("heatingSetpoint")
-
-	log.debug "refresh called ${setPoint}"
-
     def degreesInteger = Math.round(setPoint)
     def temperatureScale = getTemperatureScale()
-
-    log.debug "${degreesInteger} ${temperatureScale}"
+    
+    log.debug "refresh called ${setPoint} ${degreesInteger} ${temperatureScale}"
 
     sendEvent("name": "temperature", "value": degreesInteger, "unit": temperatureScale)   
-    // sendEvent("name": "heat", "value": degreesInteger, "unit": temperatureScale)
 
 	log.debug "refresh ended"
 }
@@ -142,7 +158,7 @@ private getHostAddress() {
         }
     }
 
-    log.debug "Using IP: $ip and port: $port for device: ${device.id}"
+    log.debug "Using IP: ${convertHexToIP(ip)} and port: ${convertHexToInt(port)} for device: ${device.id}"
     return convertHexToIP(ip) + ":" + convertHexToInt(port)
 }
 
