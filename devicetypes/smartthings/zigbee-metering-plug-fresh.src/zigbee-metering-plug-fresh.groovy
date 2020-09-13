@@ -34,8 +34,8 @@ metadata {
         fingerprint manufacturer: "DAWON_DNS", model: "PM-B530-ZB", deviceJoinName: "Dawon Outlet" // DAWON DNS Smart Plug PM-B530-ZB (16A), raw description: 01 0104 0051 01 07 0000, 0004, 0003, 0006, 0019, 0702, 0B04 07 0000, 0004, 0003, 0006, 0019, 0702, 0B04
         fingerprint manufacturer: "DAWON_DNS", model: "PM-C140-ZB", deviceJoinName: "Dawon Outlet" // DAWON DNS In-Wall Outlet PM-C140-ZB, raw description: 01 0104 0051 01 0A 0000 0002 0003 0004 0006 0019 0702 0B04 0008 0009 0A 0000 0002 0003 0004 0006 0019 0702 0B04 0008 0009
 
-		fingerprint endpointId: "01", profileId: "0104", inClusters: "0000,0003,0006,0004,0005,0008", outClusters: "0019"
-        fingerprint endpointId: "02", profileId: "0104", inClusters: "0702,0006"
+		fingerprint manufacturer: "Compacta International, Ltd", model: "ZBMLC30", deviceJoinName: "Smartenit 30A Switch", endpointId: "01", profileId: "0104", inClusters: "0000,0003,0006,0004,0005,0008", outClusters: "0019"
+        fingerprint manufacturer: "Compacta International, Ltd", model: "ZBMLC30", deviceJoinName: "Smartenit 30A Switch", endpointId: "02", profileId: "0104", inClusters: "0702,0006"
 	}
 
     tiles(scale: 2)
@@ -65,6 +65,10 @@ metadata {
                 state "default", label:'reset kWh', action:"reset"
         }
 
+        attribute "divisor", "number"
+        attribute "multiplier", "number"
+        boolean debug = false
+        
         main(["switch"])
         
         details(["switch","power","energy","refresh","reset"])
@@ -73,11 +77,11 @@ metadata {
 
 def parse(String description)
 {
-    log.debug "start: parse() == description is $description"
+    if (debug) log.debug "start: parse() == description is $description"
     
     def event = zigbee.getEvent(description)
     if (event) {
-        log.info "start event : $event"
+        if (debug) log.info "start event : $event"
         if (event.name == "power") {
             event.value = event.value/getPowerDiv()
             event.unit = "W"
@@ -85,24 +89,35 @@ def parse(String description)
             event.value = event.value/getEnergyDiv()
             event.unit = "kWh"
         }
-        log.info "end event :  == Sending $event"
+        if (debug) log.info "end event :  == Sending $event"
         sendEvent(event)
     }
     
     List result = []
     def descMap = zigbee.parseDescriptionAsMap(description)
-    if (descMap.cluster) {
-        log.debug "cluster $descMap.cluster attrId $descMap.attrId encoding $descMap.encoding value $descMap.value result $descMap.result"
-        log.debug "descMap enter:"
-        // if (descMap?.result != "success") return
-        if ((descMap.cluster == "0008")) {
-            // Ignore Cluster 0008 for now
-        } else if ((descMap.cluster == "0702") && (descMap.attrId == "0000")) {
-				log.debug "Found 702/0000 Power Delivered"
-                log.debug "$descMap.attrId Power delivered $descMap.value"
+    if ((descMap.cluster)) {
+        if (debug) log.debug "cluster $descMap.cluster attrId $descMap.attrId encoding $descMap.encoding value $descMap.value result $descMap.result"
+        if (debug) log.debug "descMap enter:"
+        
+        int cluster = Integer.parseInt(descMap.cluster, 16)
+        int attrId = Integer.parseInt(descMap.attrId, 16)
+        int value = Integer.parseInt(descMap.value, 16)
+
+        int div  = device.currentValue("divisor")
+        int mult = device.currentValue("multiplier")
+
+        if (debug) log.info "Current Divisor $div, Multiplier $mult"
+
+        if ((cluster == 0x8) && (attrId == 0x0)) {
+            if (debug) log.debug "Found 0008/0000 Level"
+            if (debug) log.debug "$descMap.cluster/$descMap.attrId Level $descMap.value"
+           // Ignore Level Cluster (0008) for now
+        } else if ((cluster == 0x702) && (attrId == 0x0)) {
+				if (debug) log.debug "Found 702/0000 Power Delivered"
+                if (debug) log.debug "$descMap.cluster/$descMap.attrId Power delivered $descMap.value"
 
                 int delivered = Integer.parseInt(descMap.value, 16)
-                log.debug sprintf("Power delivered is %d", delivered)
+                if (debug) log.debug sprintf("Power delivered is %d", delivered)
                 
                 Double current = delivered * getEnergyMult() / getEnergyDiv()
                 
@@ -112,29 +127,41 @@ def parse(String description)
                 map.unit = "kWh"
                 if (map) {
                     result << createEvent(map)
-                    log.info "$descMap.attrId/$descMap.attrId sending $result"
+                    if (debug) log.info "$descMap.attrId/$descMap.attrId sending $result"
                 }
-            } else if ((descMap.cluster == "0702") && (descMap.attrId == "0300")) {
-				log.debug "Found 702/0300 Unit of Measure"
-                log.debug "$descMap.attrId/$descMap.attrId Unit of measure $descMap.value"
+        } else if ((cluster == 0x0702) && (attrId == 0x0300)) {
+				if (debug) log.debug "Found 702/0300 Unit of Measure"
+                if (debug) log.debug "$descMap.cluster/$descMap.attrId Unit of measure $descMap.value"
 
-            } else if ((descMap.cluster == "0702") && (descMap.attrId == "0301")) {
-                log.debug "Found 702/0301 Multiplier"
-                log.debug "$descMap.attrId/$descMap.attrId Multiplier $descMap.value"
+        } else if ((cluster == 0x0702) && (attrId == 0x0301)) {
+                if (debug) log.debug "Found 702/0301 Multiplier"
+                if (debug) log.debug "$descMap.cluster/$descMap.attrId Multiplier $descMap.value"
                 int multiplier = Integer.parseInt(descMap.value, 16)
-                log.debug sprintf("multiplier is %d", multiplier)
-
-            } else if ((descMap.cluster == "0702") && (descMap.attrId == "0302")) {
-				log.debug "Found 702/0302 Divisor"
-                log.debug "$descMap.attrId/$descMap.attrId Divisor $descMap.value"
+                if (debug) log.debug sprintf("multiplier is %d", multiplier)
+                def map = [:]
+                map.name = "multiplier"
+                map.value = multiplier
+                if (map) {
+                    result << createEvent(map)
+                    if (debug) log.info "$descMap.attrId/$descMap.attrId sending $result"
+                }
+        } else if ((cluster == 0x0702) && (attrId == 0x0302)) {
+				if (debug) log.debug "Found 702/0302 Divisor"
+                if (debug) log.debug "$descMap.cluster/$descMap.attrId Divisor $descMap.value"
                 int divisor = Integer.parseInt(descMap.value, 16)
-                log.debug sprintf("divisor is %d", divisor)
-
-            } else if ((descMap.cluster == "0702") && (descMap.attrId == "0400")) {
-				log.debug "Found 702/0400 Power"
-                log.debug "$descMap.attrId/$descMap.attrId Power $descMap.value"
+                if (debug) log.debug sprintf("divisor is %d", divisor)
+                def map = [:]
+                map.name = "divisor"
+                map.value = divisor
+                if (map) {
+                    result << createEvent(map)
+                    if (debug) log.info "$descMap.attrId/$descMap.attrId sending $result"
+                }
+        } else if ((cluster == 0x0702) && (attrId == 0x0400)) {
+				if (debug) log.debug "Found 702/0400 Power"
+                if (debug) log.debug "$descMap.cluster/$descMap.attrId Power $descMap.value"
                 int power = Integer.parseInt(descMap.value, 16)
-                log.debug sprintf("Current Power Consumption is %d", power)
+                if (debug) log.debug sprintf("Current Power Consumption is %d", power)
                 
                 Double current = power * getPowerMult() / getPowerDiv()
                 
@@ -144,14 +171,13 @@ def parse(String description)
                 map.unit = "W"
                 if (map) {
                     result << createEvent(map)
-                    log.info "$descMap.attrId/$descMap.attrId sending $result"
+                    if (debug) log.info "$descMap.cluster/$descMap.attrId sending $result"
                 }
         } else {
-            log.error "$descMap.attrId Unhandled read attr - : desc:${description}"
+            if (debug) log.error "$descMap.attrId Unhandled read attr - : desc:${description}"
         }
-        log.debug "descMap exit:"
-    }
-    if (description?.startsWith("catchall: 0104 0006 01 01 0140 00") ||
+        if (debug) log.debug "descMap exit:"
+    } else if (description?.startsWith("catchall: 0104 0006 01 01 0140 00") ||
         description?.startsWith("catchall: 0104 0006 02 01 0140 00")) {
         if (description?.endsWith(" 0100") || description?.endsWith(" 1001")) {
             def map = [:]
@@ -159,7 +185,7 @@ def parse(String description)
             map.value = "on"
             if (map) {
                 result << createEvent(map)
-                log.debug "Switch On: Sending $result"
+                if (debug) log.debug "Switch On: Sending $result"
             }
 		} else if (description?.endsWith(" 0000") || description?.endsWith(" 1000")) {
             def map = [:]
@@ -167,52 +193,50 @@ def parse(String description)
             map.value = "off"
             if (map) {
                 result << createEvent(map)
-                log.debug "Switch Off: Sending $result"
+                if (debug) log.debug "Switch Off: Sending $result"
             }
         }
     }
 
-    log.debug "end parse() : == returning $result"
+    if (debug) log.debug "end parse() : == returning $result"
 
     return result
 }
 
 def off()
 {
-    log.debug "start off() :"
+    if (debug) log.debug "start off() :"
 
     def cmds = []
 
     cmds += zigbee.off()
 
-    // Power delivered, EndPoint 2, Cluster 0702 Attribute 0000
     cmds += getEnergy()
-
-    // Instantaneous Demand, EndPoint 2, Cluster 0702 Attribute 0400
     cmds += getPower()
-
-    log.debug "end off() : == $cmds"
+    cmds += getDivisor()
+    cmds += getMultiplier()
+    
+    if (debug) log.debug "end off() : == $cmds"
     return cmds
 }
 
 def on()
 {
-    log.debug "start on() :"
+    if (debug) log.debug "start on() :"
 
     def cmds = []
     
     cmds += zigbee.on()
 
-    // Power delivered, EndPoint 2, Cluster 0702 Attribute 0000
-    cmds += [ "st rattr 0x${device.deviceNetworkId} 2 0x0702 0x0000", "delay 2000" ]
-
-    // Instantaneous Demand, EndPoint 2, Cluster 0702 Attribute 0400
-    cmds += [ "st rattr 0x${device.deviceNetworkId} 2 0x0702 0x0400", "delay 2000" ]
+    cmds += getEnergy()
+    cmds += getPower()
+    cmds += getDivisor()
+    cmds += getMultiplier()
 
     if (device.getDataValue("model") == "HY0105") {
         cmds += zigbee.command(zigbee.ONOFF_CLUSTER, 0x01, "", [destEndpoint: 0x02])
     }
-    log.debug "end on() : == $cmds"
+    if (debug) log.debug "end on() : == $cmds"
     return cmds
 }
 
@@ -226,7 +250,8 @@ def ping()
 
 def refresh()
 {
-    log.debug "refresh"
+    if (debug) log.debug "refresh"
+    getAttributes() +
     zigbee.onOffRefresh() +
     zigbee.electricMeasurementPowerRefresh() +
     zigbee.readAttribute(zigbee.SIMPLE_METERING_CLUSTER, ATTRIBUTE_READING_INFO_SET)
@@ -236,37 +261,56 @@ def configure()
 {
     // this device will send instantaneous demand and current summation delivered every 1 minute
     sendEvent(name: "checkInterval", value: 2 * 60 + 10 * 60, displayed: false, data: [protocol: "zigbee", hubHardwareId: device.hub.hardwareID])
-    log.debug "Configuring Reporting"
+    if (debug) log.debug "Configuring Reporting"
     return refresh() +
     	   zigbee.onOffConfig() +
            zigbee.configureReporting(zigbee.SIMPLE_METERING_CLUSTER, ATTRIBUTE_READING_INFO_SET, DataType.UINT48, 1, 600, 1) +
            zigbee.electricMeasurementPowerConfig(1, 600, 1) +
-           zigbee.simpleMeteringPowerConfig()
+           zigbee.simpleMeteringPowerConfig() +
+           
+        [
+            "zdo bind 0x${device.deviceNetworkId} 1 1 0x0000 {${device.zigbeeId}} {}",
+            "zdo bind 0x${device.deviceNetworkId} 1 1 0x0006 {${device.zigbeeId}} {}",
+
+            "zdo bind 0x${device.deviceNetworkId} 2 1 0x0006 {${device.zigbeeId}} {}",
+            "zdo bind 0x${device.deviceNetworkId} 2 1 0x0702 {${device.zigbeeId}} {}",
+
+            "zdo bind 0x${device.deviceNetworkId} 3 1 0x0006 {${device.zigbeeId}} {}",
+        ]
+}
+
+private int getMult()
+{
+    int mult = device.currentValue("multiplier")
+
+    mult ? mult : 1
+}
+
+private int getDiv()
+{
+    int div = device.currentValue("divisor")
+    div ? div : 1000
 }
 
 private int getPowerMult()
 {
-    1
+    getMult()
 }
+
 
 private int getEnergyMult()
 {
-    1
+    getMult()
 }
 
 private int getPowerDiv()
 {
-    100
+    getDiv() / 1000
 }
 
 private int getEnergyDiv()
 {
-    100000
-}
-
-private boolean isSengledOutlet()
-{
-    device.getDataValue("model") == "E1C-NB7"
+    getDiv()
 }
 
 def parseDescriptionAsMap(description)
@@ -283,8 +327,25 @@ private def getEnergy()
     [ "st rattr 0x${device.deviceNetworkId} 2 0x0702 0x0000", "delay 2000" ]
 }
 
+private def getMultiplier()
+{
+    // Multiplier, EndPoint 2, Cluster 0702 Attribute 0301
+    [ "st rattr 0x${device.deviceNetworkId} 2 0x0702 0x0301", "delay 2000" ]
+}
+
+private def getDivisor()
+{
+    // Divisor, EndPoint 2, Cluster 0702 Attribute 0302
+    [ "st rattr 0x${device.deviceNetworkId} 2 0x0702 0x0302", "delay 2000" ]
+}
+
 private def getPower()
 {
     // Instantaneous Demand, EndPoint 2, Cluster 0702 Attribute 0400
     [ "st rattr 0x${device.deviceNetworkId} 2 0x0702 0x0400", "delay 2000" ]
+}
+
+private def getAttributes()
+{
+    getMultiplier() + getDivisor() + getPower() + getEnergy()
 }
