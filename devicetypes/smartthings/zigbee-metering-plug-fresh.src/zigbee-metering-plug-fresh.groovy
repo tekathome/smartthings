@@ -67,8 +67,8 @@ metadata {
 
         attribute "divisor", "number"
         attribute "multiplier", "number"
-        boolean debug = false
-        
+        boolean debug = true
+
         main(["switch"])
         
         details(["switch","power","energy","refresh","reset"])
@@ -77,11 +77,11 @@ metadata {
 
 def parse(String description)
 {
-    if (debug) log.debug "start: parse() == description is $description"
+    dlog "start: parse() == description is $description"
     
     def event = zigbee.getEvent(description)
     if (event) {
-        if (debug) log.info "start event : $event"
+        dlog "start event : $event"
         if (event.name == "power") {
             event.value = event.value/getPowerDiv()
             event.unit = "W"
@@ -89,15 +89,15 @@ def parse(String description)
             event.value = event.value/getEnergyDiv()
             event.unit = "kWh"
         }
-        if (debug) log.info "end event :  == Sending $event"
+        dlog "end event :  == Sending $event"
         sendEvent(event)
     }
     
     List result = []
     def descMap = zigbee.parseDescriptionAsMap(description)
     if ((descMap.cluster)) {
-        if (debug) log.debug "cluster $descMap.cluster attrId $descMap.attrId encoding $descMap.encoding value $descMap.value result $descMap.result"
-        if (debug) log.debug "descMap enter:"
+        dlog "cluster $descMap.cluster attrId $descMap.attrId encoding $descMap.encoding value $descMap.value result $descMap.result"
+        dlog "descMap enter:"
         
         int cluster = Integer.parseInt(descMap.cluster, 16)
         int attrId = Integer.parseInt(descMap.attrId, 16)
@@ -106,18 +106,18 @@ def parse(String description)
         int div  = device.currentValue("divisor")
         int mult = device.currentValue("multiplier")
 
-        if (debug) log.info "Current Divisor $div, Multiplier $mult"
+        ilog "Current Divisor $div, Multiplier $mult"
 
         if ((cluster == 0x8) && (attrId == 0x0)) {
-            if (debug) log.debug "Found 0008/0000 Level"
-            if (debug) log.debug "$descMap.cluster/$descMap.attrId Level $descMap.value"
+            dlog "Found 0008/0000 Level"
+            dlog "$descMap.cluster/$descMap.attrId Level $descMap.value"
            // Ignore Level Cluster (0008) for now
         } else if ((cluster == 0x702) && (attrId == 0x0)) {
-				if (debug) log.debug "Found 702/0000 Power Delivered"
-                if (debug) log.debug "$descMap.cluster/$descMap.attrId Power delivered $descMap.value"
+				dlog "Found 702/0000 Power Delivered"
+                dlog "$descMap.cluster/$descMap.attrId Power delivered $descMap.value"
 
                 int delivered = Integer.parseInt(descMap.value, 16)
-                if (debug) log.debug sprintf("Power delivered is %d", delivered)
+                dlog sprintf("Power delivered is %d", delivered)
                 
                 Double current = delivered * getEnergyMult() / getEnergyDiv()
                 
@@ -127,41 +127,41 @@ def parse(String description)
                 map.unit = "kWh"
                 if (map) {
                     result << createEvent(map)
-                    if (debug) log.info "$descMap.attrId/$descMap.attrId sending $result"
+                    ilog "$descMap.attrId/$descMap.attrId sending $result"
                 }
         } else if ((cluster == 0x0702) && (attrId == 0x0300)) {
-				if (debug) log.debug "Found 702/0300 Unit of Measure"
-                if (debug) log.debug "$descMap.cluster/$descMap.attrId Unit of measure $descMap.value"
+				dlog "Found 702/0300 Unit of Measure"
+                dlog "$descMap.cluster/$descMap.attrId Unit of measure $descMap.value"
 
         } else if ((cluster == 0x0702) && (attrId == 0x0301)) {
-                if (debug) log.debug "Found 702/0301 Multiplier"
-                if (debug) log.debug "$descMap.cluster/$descMap.attrId Multiplier $descMap.value"
+                dlog "Found 702/0301 Multiplier"
+                dlog "$descMap.cluster/$descMap.attrId Multiplier $descMap.value"
                 int multiplier = Integer.parseInt(descMap.value, 16)
-                if (debug) log.debug sprintf("multiplier is %d", multiplier)
+                dlog sprintf("multiplier is %d", multiplier)
                 def map = [:]
                 map.name = "multiplier"
                 map.value = multiplier
                 if (map) {
                     result << createEvent(map)
-                    if (debug) log.info "$descMap.attrId/$descMap.attrId sending $result"
+                    ilog "$descMap.attrId/$descMap.attrId sending $result"
                 }
         } else if ((cluster == 0x0702) && (attrId == 0x0302)) {
-				if (debug) log.debug "Found 702/0302 Divisor"
-                if (debug) log.debug "$descMap.cluster/$descMap.attrId Divisor $descMap.value"
+				dlog "Found 702/0302 Divisor"
+                dlog "$descMap.cluster/$descMap.attrId Divisor $descMap.value"
                 int divisor = Integer.parseInt(descMap.value, 16)
-                if (debug) log.debug sprintf("divisor is %d", divisor)
+                dlog sprintf("divisor is %d", divisor)
                 def map = [:]
                 map.name = "divisor"
                 map.value = divisor
                 if (map) {
                     result << createEvent(map)
-                    if (debug) log.info "$descMap.attrId/$descMap.attrId sending $result"
+                    ilog "$descMap.attrId/$descMap.attrId sending $result"
                 }
         } else if ((cluster == 0x0702) && (attrId == 0x0400)) {
-				if (debug) log.debug "Found 702/0400 Power"
-                if (debug) log.debug "$descMap.cluster/$descMap.attrId Power $descMap.value"
+				dlog "Found 702/0400 Power"
+                dlog "$descMap.cluster/$descMap.attrId Power $descMap.value"
                 int power = Integer.parseInt(descMap.value, 16)
-                if (debug) log.debug sprintf("Current Power Consumption is %d", power)
+                dlog sprintf("Current Power Consumption is %d", power)
                 
                 Double current = power * getPowerMult() / getPowerDiv()
                 
@@ -171,12 +171,12 @@ def parse(String description)
                 map.unit = "W"
                 if (map) {
                     result << createEvent(map)
-                    if (debug) log.info "$descMap.cluster/$descMap.attrId sending $result"
+                    ilog "$descMap.cluster/$descMap.attrId sending $result"
                 }
         } else {
-            if (debug) log.error "$descMap.attrId Unhandled read attr - : desc:${description}"
+            elog "$descMap.attrId Unhandled read attr - : desc:${description}"
         }
-        if (debug) log.debug "descMap exit:"
+        dlog "descMap exit:"
     } else if (description?.startsWith("catchall: 0104 0006 01 01 0140 00") ||
         description?.startsWith("catchall: 0104 0006 02 01 0140 00")) {
         if (description?.endsWith(" 0100") || description?.endsWith(" 1001")) {
@@ -185,7 +185,7 @@ def parse(String description)
             map.value = "on"
             if (map) {
                 result << createEvent(map)
-                if (debug) log.debug "Switch On: Sending $result"
+                dlog "Switch On: Sending $result"
             }
 		} else if (description?.endsWith(" 0000") || description?.endsWith(" 1000")) {
             def map = [:]
@@ -193,50 +193,41 @@ def parse(String description)
             map.value = "off"
             if (map) {
                 result << createEvent(map)
-                if (debug) log.debug "Switch Off: Sending $result"
+                dlog "Switch Off: Sending $result"
             }
         }
     }
 
-    if (debug) log.debug "end parse() : == returning $result"
+    dlog "end parse() : == returning $result"
 
     return result
 }
 
 def off()
 {
-    if (debug) log.debug "start off() :"
+    // if (debug == true) log.debug "start off() :"
+    dlog "start off() :"
 
     def cmds = []
 
+    cmds += getAttributes()
     cmds += zigbee.off()
-
-    cmds += getEnergy()
-    cmds += getPower()
-    cmds += getDivisor()
-    cmds += getMultiplier()
     
-    if (debug) log.debug "end off() : == $cmds"
+    dlog "end off() : == $cmds"
     return cmds
 }
 
 def on()
 {
-    if (debug) log.debug "start on() :"
+    // if (debug == true) log.debug "start on() :"
+    dlog "start on() :"
 
     def cmds = []
     
     cmds += zigbee.on()
+    cmds += getAttributes()
 
-    cmds += getEnergy()
-    cmds += getPower()
-    cmds += getDivisor()
-    cmds += getMultiplier()
-
-    if (device.getDataValue("model") == "HY0105") {
-        cmds += zigbee.command(zigbee.ONOFF_CLUSTER, 0x01, "", [destEndpoint: 0x02])
-    }
-    if (debug) log.debug "end on() : == $cmds"
+    dlog "end on() : == $cmds"
     return cmds
 }
 
@@ -250,7 +241,7 @@ def ping()
 
 def refresh()
 {
-    if (debug) log.debug "refresh"
+    dlog "refresh"
     getAttributes() +
     zigbee.onOffRefresh() +
     zigbee.electricMeasurementPowerRefresh() +
@@ -261,7 +252,7 @@ def configure()
 {
     // this device will send instantaneous demand and current summation delivered every 1 minute
     sendEvent(name: "checkInterval", value: 2 * 60 + 10 * 60, displayed: false, data: [protocol: "zigbee", hubHardwareId: device.hub.hardwareID])
-    if (debug) log.debug "Configuring Reporting"
+    dlog "Configuring Reporting"
     return refresh() +
     	   zigbee.onOffConfig() +
            zigbee.configureReporting(zigbee.SIMPLE_METERING_CLUSTER, ATTRIBUTE_READING_INFO_SET, DataType.UINT48, 1, 600, 1) +
@@ -292,26 +283,13 @@ private int getDiv()
     div ? div : 1000
 }
 
-private int getPowerMult()
-{
-    getMult()
-}
+private int getPowerMult() { getMult() }
 
+private int getEnergyMult() { getMult() }
 
-private int getEnergyMult()
-{
-    getMult()
-}
+private int getPowerDiv() { getDiv() / 1000 }
 
-private int getPowerDiv()
-{
-    getDiv() / 1000
-}
-
-private int getEnergyDiv()
-{
-    getDiv()
-}
+private int getEnergyDiv() { getDiv() }
 
 def parseDescriptionAsMap(description)
 {
@@ -345,7 +323,8 @@ private def getPower()
     [ "st rattr 0x${device.deviceNetworkId} 2 0x0702 0x0400", "delay 2000" ]
 }
 
-private def getAttributes()
-{
-    getMultiplier() + getDivisor() + getPower() + getEnergy()
-}
+private def getAttributes() { getMultiplier() + getDivisor() + getPower() + getEnergy() }
+
+private dlog(str) { log.debug str }
+private ilog(str) { log.info str }
+private elog(str) { log.error str }
