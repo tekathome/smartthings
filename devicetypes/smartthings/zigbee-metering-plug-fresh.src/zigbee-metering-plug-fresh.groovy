@@ -67,13 +67,19 @@ metadata {
 
         attribute "divisor", "number"
         attribute "multiplier", "number"
-        boolean debug = true
+        attribute "prevpower", "number"
 
         main(["switch"])
         
         details(["switch","power","energy","refresh","reset"])
+
+        preferences {
+            // input "switchAutoOff", "boolean", title: "Auto Off", defaultValue: false
+        }
     }
 }
+
+
 
 def parse(String description)
 {
@@ -117,7 +123,7 @@ def parse(String description)
                 dlog "$descMap.cluster/$descMap.attrId Power delivered $descMap.value"
 
                 int delivered = Integer.parseInt(descMap.value, 16)
-                dlog sprintf("Power delivered is %d", delivered)
+                dlog "Power delivered is $delivered"
                 
                 Double current = delivered * getEnergyMult() / getEnergyDiv()
                 
@@ -137,7 +143,7 @@ def parse(String description)
                 dlog "Found 702/0301 Multiplier"
                 dlog "$descMap.cluster/$descMap.attrId Multiplier $descMap.value"
                 int multiplier = Integer.parseInt(descMap.value, 16)
-                dlog sprintf("multiplier is %d", multiplier)
+                dlog "multiplier is $multiplier"
                 def map = [:]
                 map.name = "multiplier"
                 map.value = multiplier
@@ -149,7 +155,7 @@ def parse(String description)
 				dlog "Found 702/0302 Divisor"
                 dlog "$descMap.cluster/$descMap.attrId Divisor $descMap.value"
                 int divisor = Integer.parseInt(descMap.value, 16)
-                dlog sprintf("divisor is %d", divisor)
+                dlog "divisor is $divisor"
                 def map = [:]
                 map.name = "divisor"
                 map.value = divisor
@@ -158,21 +164,33 @@ def parse(String description)
                     ilog "$descMap.attrId/$descMap.attrId sending $result"
                 }
         } else if ((cluster == 0x0702) && (attrId == 0x0400)) {
-				dlog "Found 702/0400 Power"
-                dlog "$descMap.cluster/$descMap.attrId Power $descMap.value"
-                int power = Integer.parseInt(descMap.value, 16)
-                dlog sprintf("Current Power Consumption is %d", power)
+            dlog "Found 702/0400 Power"
+            dlog "$descMap.cluster/$descMap.attrId Power $descMap.value"
+            int power = Integer.parseInt(descMap.value, 16)
+            dlog "Current Power Consumption is $power"
                 
-                Double current = power * getPowerMult() / getPowerDiv()
-                
-                def map = [:]
-                map.name = "power"
-                map.value = current
-                map.unit = "W"
-                if (map) {
-                    result << createEvent(map)
-                    ilog "$descMap.cluster/$descMap.attrId sending $result"
-                }
+            Double current = power * getPowerMult() / getPowerDiv()
+            Double prevpower = getPrevPower()
+            Double lastpower = device.currentValue("power")
+            dlog "XXXX prev power $prevpower current power $current last power $lastpower"
+            if ((power == 0) && (prevpower == 0) && (lastpower == 0)) {
+                def smap = [:]
+                smap.name = "switch"
+                smap.value = "off"
+                // result << createEvent(smap)
+            }
+            
+            def pmap = [:]
+            pmap.name = "prevpower"
+            pmap.value = prevpower
+            result << createEvent(pmap)
+
+            def map = [:]
+            map.name = "power"
+            map.value = current
+            map.unit = "W"
+            result << createEvent(map)
+            ilog "$descMap.cluster/$descMap.attrId sending $result"
         } else {
             elog "$descMap.attrId Unhandled read attr - : desc:${description}"
         }
@@ -207,6 +225,10 @@ def off()
 {
     // if (debug == true) log.debug "start off() :"
     dlog "start off() :"
+    def event = [:]
+    event.name = "prevpower"
+    event.value = prevpower
+    sendEvent(event)
 
     def cmds = []
 
@@ -268,6 +290,12 @@ def configure()
 
             "zdo bind 0x${device.deviceNetworkId} 3 1 0x0006 {${device.zigbeeId}} {}",
         ]
+}
+
+private Double getPrevPower()
+{
+    Double prev = device.currentValue("prevpower")
+    prev ? prev : 0
 }
 
 private int getMult()
