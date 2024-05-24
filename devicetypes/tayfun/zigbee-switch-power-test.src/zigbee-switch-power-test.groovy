@@ -63,11 +63,11 @@ metadata {
             input "switchAutoOff", "boolean", title: "Auto Off", defaultValue: false
         }
 
-		attribute "attrDivisor", "number"		// Divisor
+	attribute "attrDivisor", "number"	// Divisor
         attribute "attrMultiplier", "number"	// Multiplier
-        attribute "attrPower", "number"			// Current Power
-        attribute "attrDelivered", "number"		// Power delivered
-        attribute "attrUnit", "number"			// Unit of Measure
+        attribute "attrPower", "number"		// Current Power
+        attribute "attrDelivered", "number"	// Power delivered
+        attribute "attrUnit", "number"		// Unit of Measure
         attribute "attrPendingOff", "number"
 
         main "switch"
@@ -78,89 +78,87 @@ metadata {
 
 // Parse incoming device messages to generate events
 def parse(String description) {
-    int mult = device.currentValue("attrMultiplier") // Multiplier as reported by device
+	int mult = device.currentValue("attrMultiplier") // Multiplier as reported by device
 	int div = device.currentValue("attrDivisor") // Divisor as reported by device
-    int power = device.currentValue("attrPower") // Current Power as reported by device
-    int delivered = device.currentValue("attrDelivered") // Total power delivered as reported by device
-    int unit = device.currentValue("attrUnit") // Unit of Measure as reported by device
+	int power = device.currentValue("attrPower") // Current Power as reported by device
+	int delivered = device.currentValue("attrDelivered") // Total power delivered as reported by device
+	int unit = device.currentValue("attrUnit") // Unit of Measure as reported by device
 
 	//log.info "Current mult=$mult, div=$div, pwr=$pwr, delivered=$delivered"
 
 	//log.debug "description is $description"
 
 	if (description?.startsWith("read attr -")) {
-        def descMap = parseDescriptionAsMap(description)
+        	def descMap = parseDescriptionAsMap(description)
 		//log.debug "cluster $descMap.cluster attrId $descMap.attrId encoding $descMap.encoding value $descMap.value"
-		switch(descMap.cluster) {
+	switch(descMap.cluster) {
         case "0702":
-			switch (descMap.attrId) {
-			case "0300": // Unit of Measure
-				//log.debug "Found 702/0300 Unit of Measure"
-                unit = Integer.parseInt(descMap.value, 16)
-               	//log.info "Unit of Measure : $unit"
-               	sendEvent(name:"attrUnit", value:"$unit") 
+		switch (descMap.attrId) {
+		case "0300": // Unit of Measure
+			//log.debug "Found 702/0300 Unit of Measure"
+                	unit = Integer.parseInt(descMap.value, 16)
+               		//log.info "Unit of Measure : $unit"
+               		sendEvent(name:"attrUnit", value:"$unit") 
+	          	break;
+
+		case "0301": // Multiplier
+			//log.debug "Found 702/0301 Multiplier"
+                	mult = Integer.parseInt(descMap.value, 16)
+			//log.info "Multiplier : $mult"
+               		sendEvent(name:"attrMultiplier", value:"$mult") 
 	           	break;
 
-			case "0301": // Multiplier
-				//log.debug "Found 702/0301 Multiplier"
-                mult = Integer.parseInt(descMap.value, 16)
-                //log.info "Multiplier : $mult"
-               	sendEvent(name:"attrMultiplier", value:"$mult") 
+ 		case "0302": // Divisor
+			//log.debug "Found 702/0302 Divisor"
+                	div = Integer.parseInt(descMap.value, 16)
+                	//log.info "Divisor : $div"
+	        	sendEvent(name:"attrDivisor", value:"$div") 
+                	div = device.currentValue("attrDivisor")
 	           	break;
 
- 			case "0302": // Divisor
-				//log.debug "Found 702/0302 Divisor"
-                div = Integer.parseInt(descMap.value, 16)
-                //log.info "Divisor : $div"
-	           	sendEvent(name:"attrDivisor", value:"$div") 
-                div = device.currentValue("attrDivisor")
-	           	break;
+            	case "0000": // Power Delivered
+			log.debug "Found 702/0000 Power Delivered"
+                	delivered = Integer.parseInt(descMap.value, 16)
+			sendEvent(name:"attrDelivered", value:"$delivered") 
+                	log.debug "702/0000 Div=$div, mult=$mult, power=$power, del=$delivered"
 
-            case "0000": // Power Delivered
-				log.debug "Found 702/0000 Power Delivered"
-                delivered = Integer.parseInt(descMap.value, 16)
-				sendEvent(name:"attrDelivered", value:"$delivered") 
-                log.debug "702/0000 Div=$div, mult=$mult, power=$power, del=$delivered"
+                	if (div != 0) {
+                		def name = "power"
+                		Double delkw = delivered * mult / div
+                    		Double curkw = power * mult / div
+				def kw = sprintf("Total %.1f kWh / %.2f kW", delkw, curkw)
+                    		log.debug "sending event name=$name, value=$kw"
+                		sendEvent(name: "power", value: "$kw")
+			}
+            		break;
 
-                if (div != 0) {
-                	def name = "power"
-                	Double delkw = delivered * mult / div
-                    Double curkw = power * mult / div
-					def kw = sprintf("Total %.1f kWh / %.2f kW", delkw, curkw)
-                    log.debug "sending event name=$name, value=$kw"
-                	sendEvent(name: "power", value: "$kw")
-				}
-            	break;
+		case "0400": // Power
+			log.debug "Found 702/0400 Power"
+               		power = Integer.parseInt(descMap.value, 16)
+                	sendEvent(name:"attrPower", value:"$power")
+                	log.debug "702/0400 Div=$div, mult=$mult, power=$power del=$delivered"
 
-			case "0400": // Power
-				log.debug "Found 702/0400 Power"
-               	power = Integer.parseInt(descMap.value, 16)
-                sendEvent(name:"attrPower", value:"$power")
-                log.debug "702/0400 Div=$div, mult=$mult, power=$power del=$delivered"
+                	if (div != 0) {
+                		def name = "power"
+                		Double delkw = delivered * mult / div
+                		Double curkw = power * mult / div
+				def kw = sprintf("Total %.1f kWh / %.2f kW", delkw, curkw)
+                		log.debug "sending event name=$name, value=$kw"
+                		sendEvent(name: "power", value: "$kw")
+			}
+            		break;
 
-                if (div != 0) {
-                	def name = "power"
-                	Double delkw = delivered * mult / div
-                    Double curkw = power * mult / div
-					def kw = sprintf("Total %.1f kWh / %.2f kW", delkw, curkw)
-                    log.debug "sending event name=$name, value=$kw"
-                	sendEvent(name: "power", value: "$kw")
-				}
-            	break;
-
-             default:
-             	log.debug "Ignoring - Cluster: $descMap.cluster Attribute: $descMap.attrId"
-                break
-	         } // end switch attrId
-             break
-             
 		default:
+             		log.debug "Ignoring - Cluster: $descMap.cluster Attribute: $descMap.attrId"
+                	break
+		} // end switch attrId
+		break
+             
+	default:
         	log.debug "Ignoring - Cluster: $descMap.cluster"
-            break
-		} // end switch clusterID
-	}
-
-	else if (description?.startsWith("on/off: ")) {
+        	break
+	} // end switch clusterID
+} else if (description?.startsWith("on/off: ")) {
         //log.debug "Processing on/off description : $description"
         if (description?.endsWith(" 1")) {
         	def name = "switch"
@@ -175,28 +173,24 @@ def parse(String description) {
 		} else {
 			log.debug "Ignored description : $description" 
         }
-	}
-
-	else if (description?.startsWith("catchall: 0104 0006 01 01 0140 00") ||
+} else if (description?.startsWith("catchall: 0104 0006 01 01 0140 00") ||
 		description?.startsWith("catchall: 0104 0006 02 01 0140 00")) {
 		if (description?.endsWith(" 0100") || description?.endsWith(" 1001")) {
-        	def name = "switch"
-            def value = "on"
+			def name = "switch"
+			def value = "on"
 			sendEvent(name: "$name", value: "$value")
-            log.debug "Sending $name $value event"
+	 		log.debug "Sending $name $value event"
 		} else if (description?.endsWith(" 0000") || description?.endsWith(" 1000")) {
-        	def name = "switch"
-            def value = "off"
+        		def name = "switch"
+            		def value = "off"
 			sendEvent(name: "$name", value: "$value")
-            log.debug "Sending $name $value event"
-        }
-	}
-    
-    else if (description?.startsWith("catchall: C25D 0001 03")) {
-        	// Known mystery ... ignore it
-    } else {
-			//log.debug "Ignoring description - $description"
- 	}
+            		log.debug "Sending $name $value event"
+        	}
+} else if (description?.startsWith("catchall: C25D 0001 03")) {
+       	// Known mystery ... ignore it
+} else {
+	//log.debug "Ignoring description - $description"
+}
 }
 
 def off() {
