@@ -223,45 +223,45 @@ def on() {
         // Endpoint 2, Cluster 0006, Value  On
     	// "st cmd 0x${device.deviceNetworkId} 2 0006 1 {}", "delay 200"
 
-		// Power delivered, EndPoint 2, Cluster 0702 Attribute 0000
-	    "st rattr 0x${device.deviceNetworkId} 2 0x0702 0x0000", "delay 200",
+	// Power delivered, EndPoint 2, Cluster 0702 Attribute 0000
+	"st rattr 0x${device.deviceNetworkId} 2 0x0702 0x0000", "delay 200",
 
-	    // Instantaneous Demand, EndPoint 2, Cluster 0702 Attribute 0400
-	    "st rattr 0x${device.deviceNetworkId} 2 0x0702 0x0400", "delay 200",
+	// Instantaneous Demand, EndPoint 2, Cluster 0702 Attribute 0400
+	"st rattr 0x${device.deviceNetworkId} 2 0x0702 0x0400", "delay 200",
     ]
 }
 
 def poll() {
-    [
-        // Power delivered, EndPoint 2, Cluster 0702 Attribute 0000
-        "st rattr 0x${device.deviceNetworkId} 2 0x0702 0x0000", "delay 200",
-	    // Instantaneous Demand, EndPoint 2, Cluster 0702 Attribute 0400
-	    "st rattr 0x${device.deviceNetworkId} 2 0x0702 0x0400", "delay 200",
-    ]
+	[
+        	// Power delivered, EndPoint 2, Cluster 0702 Attribute 0000
+	        "st rattr 0x${device.deviceNetworkId} 2 0x0702 0x0000", "delay 200",
+		// Instantaneous Demand, EndPoint 2, Cluster 0702 Attribute 0400
+		"st rattr 0x${device.deviceNetworkId} 2 0x0702 0x0400", "delay 200",
+	]
 }
 
 def refresh() {
 	[
  		// Switch status, EndPoint 1, Cluster = 0x0006 - On/Off(Switch), Attribute = 0x0000
-	    "st rattr 0x${device.deviceNetworkId} 1 0x0006 0x0000", "delay 200",
+		"st rattr 0x${device.deviceNetworkId} 1 0x0006 0x0000", "delay 200",
 
  		// Switch status, EndPoint 2, Cluster = 0x0006 - On/Off(Switch), Attribute = 0x0000
-	    "st rattr 0x${device.deviceNetworkId} 2 0x0006 0x0000", "delay 200",
+		"st rattr 0x${device.deviceNetworkId} 2 0x0006 0x0000", "delay 200",
 
-	    // Power delivered, EndPoint 2, Cluster 0702 Attribute 0000
-	    "st rattr 0x${device.deviceNetworkId} 2 0x0702 0x0000", "delay 200",
+		// Power delivered, EndPoint 2, Cluster 0702 Attribute 0000
+		"st rattr 0x${device.deviceNetworkId} 2 0x0702 0x0000", "delay 200",
 
-	    // Instantaneous Demand, EndPoint 2, Cluster 0702 Attribute 0400
-	    "st rattr 0x${device.deviceNetworkId} 2 0x0702 0x0400", "delay 200",
+		// Instantaneous Demand, EndPoint 2, Cluster 0702 Attribute 0400
+		"st rattr 0x${device.deviceNetworkId} 2 0x0702 0x0400", "delay 200",
 
-	    // Unit of Measure, EndPoint 2, Cluster 702 Attribute 0300
-	    "st rattr 0x${device.deviceNetworkId} 2 0x0702 0x0300", "delay 200",
+		// Unit of Measure, EndPoint 2, Cluster 702 Attribute 0300
+		"st rattr 0x${device.deviceNetworkId} 2 0x0702 0x0300", "delay 200",
 
-	    // Multiplier, EndPoint 2, Cluster 702 Attribute 0301
-	    "st rattr 0x${device.deviceNetworkId} 2 0x0702 0x0301", "delay 200",
+		// Multiplier, EndPoint 2, Cluster 702 Attribute 0301
+		"st rattr 0x${device.deviceNetworkId} 2 0x0702 0x0301", "delay 200",
 
-	    // Divisor, EndPoint 2, Cluster 0702 Atribute 0302
-	    "st rattr 0x${device.deviceNetworkId} 2 0x0702 0x0302", "delay 200",
+		// Divisor, EndPoint 2, Cluster 0702 Atribute 0302
+		"st rattr 0x${device.deviceNetworkId} 2 0x0702 0x0302", "delay 200",
 	]    
 }
 
